@@ -82,10 +82,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchWeather = async () => {
-      // ## [PERBAIKAN] GANTI KUNCI DI BAWAH INI ##
-      const API_KEY = 'e63fe637fc973e96c36e16c72de5580c'; // <-- GANTI DENGAN KUNCI DARI OPENWEATHERMAP
+      // [PERBAIKAN] Baca API Key dari environment variable
+      const API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
       const city = 'Tangerang';
       try {
+        if (!API_KEY) {
+            throw new Error("Weather API Key tidak ditemukan");
+        }
         const response = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=id`
         );
