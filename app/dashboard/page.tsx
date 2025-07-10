@@ -3,8 +3,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase';
-import { useAuth } from '../../context/AuthContext';
+import { db } from '../../lib/firebase'; // Path disesuaikan
+import { useAuth } from '../../context/AuthContext'; // Path disesuaikan
 import { useRouter } from 'next/navigation';
 
 // Import dari firebase
@@ -34,12 +34,23 @@ import {
   CartesianGrid,
 } from 'recharts';
 
-// Definisi Tipe Data
+// [PERBAIKAN] Tipe data spesifik untuk cuaca agar tidak 'any'
+interface WeatherData {
+  main: {
+    temp: number;
+  };
+  weather: {
+    description: string;
+    icon: string;
+  }[];
+}
+
+// Definisi Tipe Data lainnya
 interface Sale {
   id: string;
   itemName: string;
   price: number;
-  createdAt: any;
+  createdAt: any; // Dibiarkan any karena dari server, ini tidak masalah
   saleDate: string;
 }
 interface WeeklySummary {
@@ -61,7 +72,10 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  const [weather, setWeather] = useState<any>(null);
+  // [PERBAIKAN] Gunakan tipe WeatherData, bukan 'any'
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+
+  // State lainnya
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [sales, setSales] = useState<Sale[]>([]);
@@ -74,36 +88,34 @@ export default function DashboardPage() {
 
   // --- BAGIAN 2: useEffect untuk berbagai keperluan ---
 
+  // Redirect jika pengguna tidak login
   useEffect(() => {
-    if (!user) {
+    if (user === null) {
       router.push('/login');
     }
   }, [user, router]);
 
+  // Mengambil data cuaca
   useEffect(() => {
     const fetchWeather = async () => {
-      // [PERBAIKAN] Baca API Key dari environment variable
       const API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
       const city = 'Tangerang';
       try {
-        if (!API_KEY) {
-            throw new Error("Weather API Key tidak ditemukan");
-        }
+        if (!API_KEY) throw new Error("Weather API Key tidak ditemukan");
         const response = await fetch(
           `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=id`
         );
-        if (!response.ok) throw new Error('Gagal mengambil data cuaca. Pastikan API Key Anda benar dan sudah aktif.');
+        if (!response.ok) throw new Error('Gagal mengambil data cuaca');
         const data = await response.json();
         setWeather(data);
-      } catch (error) {
+      } catch (error) { // Tipe error otomatis 'unknown'
         console.error(error);
       }
     };
-    if (user) {
-        fetchWeather();
-    }
+    if (user) fetchWeather();
   }, [user]);
 
+  // Mengambil riwayat penjualan harian
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -119,6 +131,7 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, [selectedDate, user]);
 
+  // Mengambil dan memproses data untuk grafik 7 hari
   useEffect(() => {
     if (!user) return;
     const fetchWeeklyData = async () => {
@@ -243,6 +256,7 @@ export default function DashboardPage() {
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-8 bg-gray-100">
       <div className="w-full max-w-6xl">
+        {/* Header */}
         <div className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-lg shadow-md">
           <div>
             <h1 className="text-2xl font-bold capitalize">Halo, {userName}!</h1>
@@ -252,27 +266,23 @@ export default function DashboardPage() {
             {weather && (
               <div className="flex items-center text-right">
                 <div>
-                  <p className="font-semibold text-lg">
-                    {Math.round(weather.main.temp)}°C
-                  </p>
-                  <p className="text-sm text-gray-500 capitalize">
-                    {weather.weather[0].description}
-                  </p>
+                  <p className="font-semibold text-lg">{Math.round(weather.main.temp)}°C</p>
+                  <p className="text-sm text-gray-500 capitalize">{weather.weather[0].description}</p>
                 </div>
+                {/* [PERBAIKAN] Tambahkan width dan height pada <img> */}
                 <img
                   src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}.png`}
                   alt="weather icon"
+                  width="50"
+                  height="50"
                 />
               </div>
             )}
-            <button
-              onClick={handleLogout}
-              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg"
-            >
-              Logout
-            </button>
+            <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Logout</button>
           </div>
         </div>
+        
+        {/* Sisa dari dashboard Anda */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
             <div className="lg:col-span-2 bg-blue-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-center text-center h-full">
                 <h2 className="text-2xl">Total Penjualan untuk {selectedDate}</h2>
