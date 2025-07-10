@@ -3,60 +3,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { db } from '../../lib/firebase'; // Path disesuaikan
-import { useAuth } from '../../context/AuthContext'; // Path disesuaikan
+import { db, auth } from '../../lib/firebase';
+import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image'; // [PERBAIKAN] Import Image dari Next.js
 
 // Import dari firebase
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  serverTimestamp,
-  query,
-  where,
-  orderBy,
-  doc,
-  deleteDoc,
-  updateDoc,
-  getDocs,
+  collection, addDoc, onSnapshot, serverTimestamp, query,
+  where, orderBy, doc, deleteDoc, updateDoc, getDocs, FieldValue
 } from 'firebase/firestore';
 
 // Import dari recharts
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  CartesianGrid,
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 
-// [PERBAIKAN] Tipe data spesifik untuk cuaca agar tidak 'any'
+// [PERBAIKAN] Tipe data spesifik untuk cuaca
 interface WeatherData {
-  main: {
-    temp: number;
-  };
-  weather: {
-    description: string;
-    icon: string;
-  }[];
+  main: { temp: number; };
+  weather: { description: string; icon: string; }[];
 }
 
 // Definisi Tipe Data lainnya
 interface Sale {
-  id: string;
-  itemName: string;
-  price: number;
-  createdAt: any; // Dibiarkan any karena dari server, ini tidak masalah
+  id: string; itemName: string; price: number;
+  createdAt: FieldValue | Date; // [PERBAIKAN] Tipe spesifik
   saleDate: string;
 }
-interface WeeklySummary {
-  date: string;
-  total: number;
-}
+interface WeeklySummary { date: string; total: number; }
 
 // Fungsi Helper
 const getFormattedDate = (date: Date): string => {
@@ -68,74 +44,64 @@ const getFormattedDate = (date: Date): string => {
 
 // Komponen Utama
 export default function DashboardPage() {
-  // --- BAGIAN 1: Hooks dan State ---
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  // [PERBAIKAN] Gunakan tipe WeatherData, bukan 'any'
+  // [PERBAIKAN] Gunakan tipe WeatherData
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   // State lainnya
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [sales, setSales] = useState<Sale[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(
-    getFormattedDate(new Date())
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(getFormattedDate(new Date()));
   const [isEditing, setIsEditing] = useState(false);
   const [currentSale, setCurrentSale] = useState<Sale | null>(null);
   const [weeklyData, setWeeklyData] = useState<WeeklySummary[]>([]);
 
-  // --- BAGIAN 2: useEffect untuk berbagai keperluan ---
-
-  // Redirect jika pengguna tidak login
+  // useEffect untuk redirect
   useEffect(() => {
-    if (user === null) {
-      router.push('/login');
-    }
-  }, [user, router]);
+    const unsubscribe = auth.onAuthStateChanged(currentUser => {
+        if (!currentUser) {
+            router.push('/login');
+        }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
-  // Mengambil data cuaca
+  // useEffect untuk cuaca
   useEffect(() => {
     const fetchWeather = async () => {
       const API_KEY = process.env.NEXT_PUBLIC_WEATHER_API_KEY;
       const city = 'Tangerang';
       try {
         if (!API_KEY) throw new Error("Weather API Key tidak ditemukan");
-        const response = await fetch(
-          `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=id`
-        );
+        const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=id`);
         if (!response.ok) throw new Error('Gagal mengambil data cuaca');
         const data = await response.json();
         setWeather(data);
-      } catch (error) { // Tipe error otomatis 'unknown'
+      } catch (error) {
         console.error(error);
       }
     };
     if (user) fetchWeather();
   }, [user]);
 
-  // Mengambil riwayat penjualan harian
+  // useEffect untuk riwayat penjualan harian
   useEffect(() => {
     if (!user) return;
-    const q = query(
-      collection(db, 'sales'),
-      where('saleDate', '==', selectedDate),
-      orderBy('createdAt', 'desc')
-    );
+    const q = query(collection(db, 'sales'), where('saleDate', '==', selectedDate), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSales(
-        snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Sale))
-      );
+      setSales(snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id } as Sale)));
     });
     return () => unsubscribe();
   }, [selectedDate, user]);
 
-  // Mengambil dan memproses data untuk grafik 7 hari
+  // useEffect untuk data grafik
   useEffect(() => {
     if (!user) return;
     const fetchWeeklyData = async () => {
-      const dates = [];
+      const dates: string[] = [];
       const summary: { [key: string]: number } = {};
       for (let i = 6; i >= 0; i--) {
         const date = new Date(selectedDate);
@@ -161,98 +127,57 @@ export default function DashboardPage() {
     fetchWeeklyData();
   }, [selectedDate, sales, user]);
 
-  // --- BAGIAN 3: Fungsi-fungsi Handler ---
-
+  // Fungsi-fungsi Handler
   const handleLogout = async () => {
-    try {
-      await logout();
-      router.push('/login');
-    } catch (e) {
-      console.error(e);
-    }
+    try { await logout(); router.push('/login'); } catch (e) { console.error(e); }
   };
-
   const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    setPrice(value);
+    const value = e.target.value.replace(/[^0-9]/g, ''); setPrice(value);
   };
-
   const handleEditClick = (sale: Sale) => {
-    setIsEditing(true);
-    setCurrentSale(sale);
-    setItemName(sale.itemName);
-    setPrice(String(sale.price));
+    setIsEditing(true); setCurrentSale(sale); setItemName(sale.itemName); setPrice(String(sale.price));
   };
-
   const handleUpdateSale = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentSale || price === '') return;
+    e.preventDefault(); if (!currentSale || price === '') return;
     const saleDocRef = doc(db, 'sales', currentSale.id);
-    await updateDoc(saleDocRef, { itemName, price: Number(price) });
-    handleCancelEdit();
+    await updateDoc(saleDocRef, { itemName, price: Number(price) }); handleCancelEdit();
   };
-
   const handleCancelEdit = () => {
-    setIsEditing(false);
-    setCurrentSale(null);
-    setItemName('');
-    setPrice('');
+    setIsEditing(false); setCurrentSale(null); setItemName(''); setPrice('');
   };
-
   const addSale = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (itemName !== '' && price !== '') {
-      await addDoc(collection(db, 'sales'), {
-        itemName,
-        price: Number(price),
-        createdAt: serverTimestamp(),
-        saleDate: selectedDate,
-      });
-      setItemName('');
-      setPrice('');
+    e.preventDefault(); if (itemName !== '' && price !== '') {
+      await addDoc(collection(db, 'sales'), { itemName, price: Number(price), createdAt: serverTimestamp(), saleDate: selectedDate });
+      setItemName(''); setPrice('');
     }
   };
-
   const deleteSale = async (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus data penjualan ini?')) {
-      await deleteDoc(doc(db, 'sales', id));
-    }
+    if (window.confirm('Apakah Anda yakin?')) { await deleteDoc(doc(db, 'sales', id)); }
   };
 
-  // --- BAGIAN 4: Kalkulasi dan Persiapan Render ---
-
+  // Tampilan Loading
   if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
-      </div>
-    );
+    return <div className="flex h-screen items-center justify-center"><p>Loading...</p></div>;
   }
 
+  // Kalkulasi dan persiapan render
   const userName = user.email?.split('@')[0] || 'Karyawan';
-  const today = new Date().toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const totalSales = sales.reduce((sum, sale) => sum + sale.price, 0);
   const yAxisFormatter = (value: number) => value.toLocaleString('id-ID');
   const calculateYAxisTicks = () => {
     const maxYValue = Math.max(...weeklyData.map((d) => d.total), 0);
-    const tickInterval = 5000;
-    const ticks = [];
+    const tickInterval = 5000; const ticks: number[] = [];
     if (maxYValue === 0) {
       for (let i = 0; i <= 25000; i += tickInterval) ticks.push(i);
       return ticks;
     }
-    for (let i = 0; i <= maxYValue + tickInterval; i += tickInterval)
-      ticks.push(i);
+    for (let i = 0; i <= maxYValue + tickInterval; i += tickInterval) ticks.push(i);
     return ticks;
   };
   const yAxisTicks = calculateYAxisTicks();
 
-  // --- BAGIAN 5: Tampilan JSX ---
+  // Tampilan JSX
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-8 bg-gray-100">
       <div className="w-full max-w-6xl">
@@ -269,13 +194,8 @@ export default function DashboardPage() {
                   <p className="font-semibold text-lg">{Math.round(weather.main.temp)}°C</p>
                   <p className="text-sm text-gray-500 capitalize">{weather.weather[0].description}</p>
                 </div>
-                {/* [PERBAIKAN] Tambahkan width dan height pada <img> */}
-                <img
-                  src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}.png`}
-                  alt="weather icon"
-                  width="50"
-                  height="50"
-                />
+                {/* [PERBAIKAN] Gunakan komponen Image dari Next.js */}
+                <Image src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}.png`} alt="weather icon" width="50" height="50" />
               </div>
             )}
             <button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Logout</button>
@@ -294,7 +214,7 @@ export default function DashboardPage() {
                 <BarChart data={weeklyData} margin={{ top: 5, right: 20, left: 30, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="date" />
-                    <YAxis tickFormatter={yAxisFormatter} ticks={yAxisTicks} domain={[0, yAxisTicks[yAxisTicks.length - 1]]} />
+                    <YAxis tickFormatter={yAxisFormatter} ticks={yAxisTicks} domain={[0, yAxisTicks[yAxisTicks.length - 1] || 25000]} />
                     <Tooltip formatter={(value: number) => `Rp ${value.toLocaleString('id-ID')}`} />
                     <Legend />
                     <Bar dataKey="total" name="Total Penjualan" fill="#8884d8" />

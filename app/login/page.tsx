@@ -18,15 +18,14 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push('/dashboard');
-    } catch (e: unknown) {
+    } catch (e: unknown) { 
       console.error(e);
-      // Cek apakah error adalah instance dari Error untuk mendapatkan pesannya
       if (e instanceof Error) {
-        const firebaseError = e as any; 
-        if (firebaseError.code === 'auth/invalid-credential') {
+        const firebaseError = e as { code?: string };
+        if (firebaseError.code === 'auth/invalid-credential' || firebaseError.code === 'auth/wrong-password' || firebaseError.code === 'auth/user-not-found') {
             setError('Email atau password salah.');
         } else {
-            setError(e.message);
+            setError('Gagal untuk login. Silakan coba lagi.');
         }
       } else {
         setError('Terjadi kesalahan yang tidak diketahui.');
@@ -37,7 +36,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-3xl font-bold text-center">Login Karyawan</h1>
+        <h1 className="text-3xl font-bold text-center">Login</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700">Email</label>
