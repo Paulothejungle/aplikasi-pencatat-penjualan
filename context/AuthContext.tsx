@@ -7,18 +7,18 @@ import {
   signOut,
   onAuthStateChanged,
   User,
-  UserCredential // [PERBAIKAN] Import tipe UserCredential
+  UserCredential
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
-// [PERBAIKAN] Definisikan tipe yang lebih spesifik untuk konteks
+// Definisikan tipe yang lebih spesifik untuk konteks
 interface AuthContextType {
   user: User | null;
   login: (email: string, pass: string) => Promise<UserCredential>;
   logout: () => Promise<void>;
 }
 
-// [PERBAIKAN] Gunakan tipe AuthContextType dan berikan nilai awal undefined
+// Gunakan tipe AuthContextType dan berikan nilai awal undefined
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
@@ -46,7 +46,7 @@ export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// [PERBAIKAN] Perbarui hook untuk menangani kemungkinan 'undefined'
+// Perbarui hook untuk menangani kemungkinan 'undefined'
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

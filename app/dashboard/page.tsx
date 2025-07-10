@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { db, auth } from '../../lib/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image'; // [PERBAIKAN] Import Image dari Next.js
+import Image from 'next/image';
 
 // Import dari firebase
 import {
@@ -20,7 +20,7 @@ import {
   Legend, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 
-// [PERBAIKAN] Tipe data spesifik untuk cuaca
+// Tipe data spesifik untuk cuaca
 interface WeatherData {
   main: { temp: number; };
   weather: { description: string; icon: string; }[];
@@ -29,7 +29,7 @@ interface WeatherData {
 // Definisi Tipe Data lainnya
 interface Sale {
   id: string; itemName: string; price: number;
-  createdAt: FieldValue | Date; // [PERBAIKAN] Tipe spesifik
+  createdAt: FieldValue | Date;
   saleDate: string;
 }
 interface WeeklySummary { date: string; total: number; }
@@ -47,10 +47,7 @@ export default function DashboardPage() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
-  // [PERBAIKAN] Gunakan tipe WeatherData
   const [weather, setWeather] = useState<WeatherData | null>(null);
-
-  // State lainnya
   const [itemName, setItemName] = useState('');
   const [price, setPrice] = useState('');
   const [sales, setSales] = useState<Sale[]>([]);
@@ -194,7 +191,6 @@ export default function DashboardPage() {
                   <p className="font-semibold text-lg">{Math.round(weather.main.temp)}°C</p>
                   <p className="text-sm text-gray-500 capitalize">{weather.weather[0].description}</p>
                 </div>
-                {/* [PERBAIKAN] Gunakan komponen Image dari Next.js */}
                 <Image src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}.png`} alt="weather icon" width="50" height="50" />
               </div>
             )}
@@ -202,6 +198,19 @@ export default function DashboardPage() {
           </div>
         </div>
         
+        {/* Input Tanggal Acuan */}
+        <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
+          <label htmlFor="date-picker" className="block text-lg font-medium text-gray-700 mb-2">Pilih Tanggal Acuan:</label>
+          {/* [PERBAIKAN] Tambahkan onChange untuk menggunakan setSelectedDate */}
+          <input
+            type="date"
+            id="date-picker"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-full p-2 border rounded-lg"
+          />
+        </div>
+
         {/* Sisa dari dashboard Anda */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 mb-8">
             <div className="lg:col-span-2 bg-blue-500 text-white p-6 rounded-lg shadow-lg flex flex-col justify-center text-center h-full">
